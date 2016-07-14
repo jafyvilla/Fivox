@@ -83,7 +83,11 @@ public:
             if( !ptr )
                 LBTHROW( std::bad_alloc( ));
         }
-        events.reset((float*) ptr );
+        float* floatPtr = (float*)ptr;
+        #pragma omp parallel for schedule(dynamic)
+        for( size_t i = 0; i < size; ++i )
+            floatPtr[i] = 0;
+        events.reset( floatPtr );
     }
 
     const float* getPositionsX() const
@@ -253,6 +257,7 @@ void EventSource::update( const size_t i, const Vector3f& pos,
         return;
     }
 
+//    #pragma omp critical
     _impl->boundingBox.merge( pos );
     _impl->events.get()[ i + size * Impl::EventOffsets::POSX ] = pos[0];
     _impl->events.get()[ i + size * Impl::EventOffsets::POSY ] = pos[1];

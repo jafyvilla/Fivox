@@ -117,13 +117,15 @@ inline void addCompartmentEvents(
 
     size_t index = 0;
     // second loop to add the actual events
-    for( const auto& i : mapping )
+//    #pragma omp parallel for
+    for( size_t i = 0; i < mapping.size(); ++i )
+//    for( const auto& i : mapping )
     {
         size_t offset;
         uint32_t cellIndex;
         uint32_t sectionId;
         uint16_t compartments;
-        std::tie( offset, cellIndex, sectionId, compartments ) = i;
+        std::tie( offset, cellIndex, sectionId, compartments ) = mapping[i];
 
         const auto& morphology = *morphologies[cellIndex];
 

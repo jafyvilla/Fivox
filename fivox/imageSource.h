@@ -85,10 +85,10 @@ protected:
     void PrintSelf(std::ostream & os, itk::Indent indent) const override;
 
     /** ImageSource is implemented as a multithreaded filter. */
-    void ThreadedGenerateData( const ImageRegionType& outputRegionForThread,
-                               itk::ThreadIdType threadId ) override;
+    void GenerateData(/* const ImageRegionType& outputRegionForThread,
+                               itk::ThreadIdType threadId*/ ) override;
 
-    void BeforeThreadedGenerateData() override;
+//    void BeforeThreadedGenerateData() override;
 
 private:
     ImageSource(const Self &); //purposely not implemented

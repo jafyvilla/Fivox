@@ -34,6 +34,7 @@ common_find_package(Lexis)
 common_find_package(Livre)
 common_find_package(vmmlib REQUIRED)
 common_find_package(ZeroEQ)
+common_find_package(OpenMP)
 common_find_package_post()
 
 include(${ITK_USE_FILE})

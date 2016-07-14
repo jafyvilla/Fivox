@@ -25,7 +25,7 @@
 
 #include <fivox/densityFunctor.h>
 #include <itkProgressReporter.h>
-#include <itkImageLinearIteratorWithIndex.h>
+#include <itkImageRegionIteratorWithIndex.h>
 
 namespace fivox
 {
@@ -35,10 +35,10 @@ template< typename TImage > ImageSource< TImage >::ImageSource()
     : _functor( new DensityFunctor< TImage >( Vector2f( )))
     , _progressObserver( ProgressObserver::New( ))
 {
-    itk::ImageRegionSplitterDirection::Pointer splitter =
-        itk::ImageRegionSplitterDirection::New();
-    splitter->SetDirection( _splitDirection );
-    _splitter = splitter;
+//    itk::ImageRegionSplitterDirection::Pointer splitter =
+//        itk::ImageRegionSplitterDirection::New();
+//    splitter->SetDirection( _splitDirection );
+//    _splitter = splitter;
 
     // set up default size
     static const size_t size = 256;
@@ -78,68 +78,91 @@ void ImageSource< TImage >::PrintSelf(std::ostream & os, itk::Indent indent )
 }
 
 template< typename TImage >
-void ImageSource< TImage >::ThreadedGenerateData(
-    const ImageRegionType& outputRegionForThread, itk::ThreadIdType threadId )
-{
-    ImagePointer image = Superclass::GetOutput();
-    typedef itk::ImageLinearIteratorWithIndex< TImage > ImageIterator;
-    ImageIterator i( image, outputRegionForThread );
-    i.SetDirection(0);
-    i.GoToBegin();
-
-    const size_t nLines = this->GetOutput()->GetRequestedRegion().GetSize()[1] *
-                          this->GetOutput()->GetRequestedRegion().GetSize()[2];
-    itk::ProgressReporter progress( this, threadId, nLines );
-    size_t totalLines = 0;
-
-    while( !i.IsAtEnd( ))
-    {
-        const ImageIndexType& index = i.GetIndex();
-
-        const typename TImage::SpacingType spacing = image->GetSpacing();
-        typename TImage::PointType point;
-        image->TransformIndexToPhysicalPoint( index, point );
-
-        i.Set( (*_functor)( point, spacing ) );
-
-        ++i;
-        if( i.IsAtEndOfLine( ))
-        {
-            i.NextLine();
-            // report progress only once per line for lower contention on
-            // monitor. Main thread reports to itk, all others to the monitor.
-            if( threadId == 0 )
-            {
-                size_t done = _completed.set( 0 ) + 1 /*self*/;
-                totalLines += done;
-                while( done-- )
-                    progress.CompletedPixel();
-            }
-            else
-                ++_completed;
-        }
-    }
-
-    if( threadId == 0 )
-    {
-        while( totalLines < nLines )
-        {
-            _completed.waitNE( 0 );
-            size_t done = _completed.set( 0 );
-            totalLines += done;
-            while( done-- )
-                progress.CompletedPixel();
-        }
-    }
-}
-
-template< typename TImage >
-void ImageSource< TImage >::BeforeThreadedGenerateData()
+void ImageSource< TImage >::GenerateData(
+ /*   const ImageRegionType& outputRegionForThread, itk::ThreadIdType threadId */)
 {
     _completed = 0;
     _functor->beforeGenerate();
     _progressObserver->reset();
+
+    ImagePointer image = Superclass::GetOutput();
+    typedef itk::ImageRegionIteratorWithIndex< TImage > ImageIterator;
+
+    const typename TImage::SizeType vSize =
+            image->GetLargestPossibleRegion().GetSize();
+//    const size_t numPixels = vSize[0] * vSize[1] * vSize[2];
+
+//    ImageIterator i( image, image->GetLargestPossibleRegion()/* outputRegionForThread */);
+//    i.SetDirection(0);
+//    i.GoToBegin();
+//const itk::ThreadIdType threadId = 0;
+//    const size_t nLines = this->GetOutput()->GetRequestedRegion().GetSize()[1] *
+//                          this->GetOutput()->GetRequestedRegion().GetSize()[2];
+//    itk::ProgressReporter progress( this, threadId, nLines );
+//    size_t totalLines = 0;
+
+    image->Allocate();
+
+    const size_t ni = vSize[0];
+    const size_t nj = vSize[1];
+    const size_t nk = vSize[2];
+    const typename TImage::SpacingType spacing = image->GetSpacing();
+    #pragma omp parallel for schedule(auto)
+    for( size_t i = 0; i < ni; ++i )
+        for( size_t j = 0; j < nj; ++j )
+            for( size_t k = 0; k < nk; ++k )
+//    while( !i.IsAtEnd( ))
+    {
+//        const ImageIndexType& index = i.GetIndex();
+        ImageIndexType index;
+        index[0] = i;
+        index[1] = j;
+        index[2] = k;
+
+        typename TImage::PointType point;
+        image->TransformIndexToPhysicalPoint( index, point );
+
+        image->SetPixel( index, (*_functor)( point, spacing ));
+//        i.Set( (*_functor)( point, spacing ) );
+
+//        ++i;
+//        if( i.IsAtEndOfLine( ))
+//        {
+//            i.NextLine();
+            // report progress only once per line for lower contention on
+            // monitor. Main thread reports to itk, all others to the monitor.
+//            if( threadId == 0 )
+//            {
+//                size_t done = _completed.set( 0 ) + 1 /*self*/;
+//                totalLines += done;
+//                while( done-- )
+//                    progress.CompletedPixel();
+//            }
+//            else
+//                ++_completed;
+//        }
+    }
+////////////////////////// find out the omp thread id to update the progress bar
+//    if( threadId == 0 )
+//    {
+//        while( totalLines < nLines )
+//        {
+//            _completed.waitNE( 0 );
+//            size_t done = _completed.set( 0 );
+//            totalLines += done;
+//            while( done-- )
+//                progress.CompletedPixel();
+//        }
+//    }
 }
+
+//template< typename TImage >
+//void ImageSource< TImage >::BeforeThreadedGenerateData()
+//{
+//    _completed = 0;
+//    _functor->beforeGenerate();
+//    _progressObserver->reset();
+//}
 
 } // end namespace fivox
 
